@@ -1,12 +1,14 @@
 {
-    "name": "david/pmutils",
-    "type": "project",
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "David Callizaya",
-            "email": "davidcallizaya@gmail.com"
-        }
-    ],
-    "require": {}
+  "name": "david/pmutils",
+  "version": "1.0.0",
+  "description": "PM dev tools",
+  "license": "MIT",
+  "minimum-stability": "dev",
+  "autoload": {
+    "psr-4": {
+      "David\\PmUtils\\": [
+        "src/"
+      ]
+    }
+  }
 }

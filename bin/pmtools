@@ -1,0 +1,12 @@
+#!/usr/bin/env php
+<?php
+require 'vendor/autoload.php';
+
+use David\PmUtils\Console;
+
+$composer = json_decode(file_get_contents('composer.json'));
+$console = new Console($composer);
+
+$console->title($composer->name . ':' . @$composer->version);
+
+$console->{$argv[1]}(...array_slice($argv, 2));
