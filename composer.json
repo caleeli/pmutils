@@ -1,0 +1,12 @@
+{
+    "name": "david/pmutils",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "David Callizaya",
+            "email": "davidcallizaya@gmail.com"
+        }
+    ],
+    "require": {}
+}
