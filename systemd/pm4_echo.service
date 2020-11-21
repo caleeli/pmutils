@@ -1,0 +1,14 @@
+[Unit]
+Description=Start a laravel-echo-server
+After=network.target
+
+[Service]
+User=david
+Group=david
+WorkingDirectory=/home/david/workspace/pm4-echo
+ExecStart=/home/david/.config/nvm/versions/node/v12.16.1/bin/node /home/david/.config/nvm/versions/node/v12.16.1/bin/laravel-echo-server start
+
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

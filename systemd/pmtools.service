@@ -1,0 +1,14 @@
+[Unit]
+Description=PMTools service
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/home/david/projects/pmutils/bin
+ExecStart=/usr/bin/php pmtools watch
+
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

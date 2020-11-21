@@ -4,11 +4,15 @@
   "description": "PM dev tools",
   "license": "MIT",
   "minimum-stability": "dev",
+  "bin": ["bin/pmtools"],
   "autoload": {
     "psr-4": {
       "David\\PmUtils\\": [
         "src/"
       ]
     }
+  },
+  "require": {
+    "doctrine/orm": "9999999-dev"
   }
 }

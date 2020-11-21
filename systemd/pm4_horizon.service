@@ -1,0 +1,14 @@
+[Unit]
+Description=Start the laravel queue service
+After=network.target
+
+[Service]
+User=apache
+Group=apache
+WorkingDirectory=/home/david/workspace/processmaker
+ExecStart=/usr/bin/php artisan horizon
+
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

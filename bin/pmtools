@@ -1,12 +1,17 @@
 #!/usr/bin/env php
 <?php
-require 'vendor/autoload.php';
+
+require __DIR__ . '/../vendor/autoload.php';
 
 use David\PmUtils\Console;
+use David\PmUtils\Str;
 
-$composer = json_decode(file_get_contents('composer.json'));
-$console = new Console($composer);
+class_alias(Str::class, 'Str');
 
-$console->title($composer->name . ':' . @$composer->version);
+$console = new Console('composer.json');
 
-$console->{$argv[1]}(...array_slice($argv, 2));
+if ($argc === 1) {
+    $console->help();
+} else {
+    $console->{$argv[1]}(...array_slice($argv, 2));
+}
