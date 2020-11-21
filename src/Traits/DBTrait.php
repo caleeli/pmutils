@@ -80,7 +80,7 @@ trait DBTrait
             $sql = "select * from {$name}";
             \fwrite($f, \json_encode($name) . "\n");
             $result = $conn->executeQuery($sql);
-            while($row = $result->fetch(FetchMode::COLUMN)) {
+            while($row = $result->fetch(FetchMode::ASSOCIATIVE)) {
                 foreach($row as $c => $col) {
                     $row[$c] = $row[$c] === '0000-00-00' ? null : $row[$c];
                 }
