@@ -4,6 +4,7 @@ namespace David\PmUtils\Traits;
 
 use David\PmUtils\Str;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\FetchMode;
 use Exception;
 
 trait DBTrait
@@ -79,7 +80,7 @@ trait DBTrait
             $sql = "select * from {$name}";
             \fwrite($f, \json_encode($name) . "\n");
             $result = $conn->executeQuery($sql);
-            while($row = $result->fetchAssociative()) {
+            while($row = $result->fetch(FetchMode::COLUMN)) {
                 foreach($row as $c => $col) {
                     $row[$c] = $row[$c] === '0000-00-00' ? null : $row[$c];
                 }
