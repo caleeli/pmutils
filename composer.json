@@ -13,6 +13,6 @@
     }
   },
   "require": {
-    "doctrine/orm": "9999999-dev"
+    "doctrine/orm": "*"
   }
 }
