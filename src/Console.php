@@ -61,14 +61,15 @@ class Console
         echo $text, "\n";
     }
 
-    private function save()
+    private function save($filename = 'composer.json', $data = null)
     {
+        if ($data === null) $data = $this->composer;
         $json = str_replace(
             ['\/', '    '],
             ['/', '  '],
-            json_encode($this->composer, JSON_PRETTY_PRINT)
+            json_encode($data, JSON_PRETTY_PRINT)
         ) . "\n";
-        file_put_contents('composer.json', $json);
+        file_put_contents($filename, $json);
     }
 
     /**
@@ -126,16 +127,195 @@ class Console
     {
         $config = $this->load('package.json');
         $path = "{$path}/node_modules/{$config->name}";
-        $skip = ['node_modules', 'tests'];
+        $skip = ['node_modules', 'tests', 'coverage', 'package.json'];
         foreach(glob('*') as $file) {
             if (in_array(basename($file), $skip)) continue;
             if (is_file($file)) {
-                $cmd = "cp $file $path/$file";
+                $this->exec("rm $path/$file");
+                $this->exec("cp $file $path");
             } else {
-                $cmd = "rsync -rp $file $path/$file";
+                $this->exec("rm -Rf $path/$file");
+                $this->exec("rsync -rp $file $path");
             }
-            $this->print($cmd);
-            passthru($cmd . ' 2>&1');
+        }
+    }
+
+    private function exec($cmd)
+    {
+        $this->print($cmd);
+        passthru($cmd . ' 2>&1', $return);
+        return $return;
+    }
+
+    public function commit($msg)
+    {
+        $dirs = [
+            '../processmaker',
+            '../modeler',
+            '../screen-builder',
+            '../vue-form-elements',
+        ];
+        $cwd = \getcwd();
+        foreach ($dirs as $dir) {
+            \chdir($dir);
+            $this->exec('git commit --message=' . $msg);
+        }
+        \chdir($cwd);
+    }
+
+    public function push()
+    {
+        $dirs = [
+            '../processmaker',
+            '../modeler',
+            '../screen-builder',
+            '../vue-form-elements',
+        ];
+        $cwd = \getcwd();
+        foreach ($dirs as $dir) {
+            \chdir($dir);
+            $this->exec('git push');
+        }
+        \chdir($cwd);
+    }
+
+    public function build()
+    {
+        $dirs = [
+            '../processmaker',
+            '../modeler',
+            '../screen-builder',
+            '../vue-form-elements',
+        ];
+        $cwd = \getcwd();
+        chdir('../vue-form-elements');
+        $this->npmupdate('../screen-builder');
+        $this->npmupdate('../modeler');
+        $this->npmupdate('../processmaker');
+        chdir('../screen-builder');
+        $this->npmupdate('../modeler');
+        $this->npmupdate('../processmaker');
+        chdir('../modeler');
+        $this->npmupdate('../processmaker');
+        \chdir($cwd);
+    }
+
+    public function npm_compare_all()
+    {
+        $dirs = [
+            '../processmaker',
+            '../modeler',
+            '../screen-builder',
+            '../vue-form-elements',
+        ];
+        $cwd = \getcwd();
+        $versions = [];
+        foreach ($dirs as $dir) {
+            $json = $this->load("{$dir}/package.json");
+            foreach($json->dependencies as $pack => $version) {
+                $versions[$dir][$pack] = $version;
+            }
+            foreach($json->devDependencies as $pack => $version) {
+                $versions[$dir][$pack] = $version;
+            }
+        }
+        // Remove non common
+        $this->print(\sprintf("%25s %20s %20s %20s %20s", '/', ...$dirs));
+        $lines = [];
+        foreach ($dirs as $dir) {
+            foreach($versions[$dir] as $pack => $version) {
+                if (isset($lines[$pack])) continue;
+                $vers = [];
+                foreach ($dirs as $dir) {
+                    if (isset($versions[$dir][$pack])) {
+                        $vers[] = $versions[$dir][$pack];
+                    }
+                }
+                if (count($vers) === count($dirs)) {
+                    $lines[$pack] = $vers;
+                }
+            }
+        }
+        foreach($lines as $pack => $vers) {
+            $ok = true;
+            foreach($vers as $i => $v) {
+                $ok = $ok && ($i === 0 || $v === $vers[$i-1]);
+            }
+            if (!$ok) {
+                echo "\033[1m";
+            }
+            $this->print(\sprintf("%25s %20s %20s %20s %20s", $pack, ...$vers));
+            echo "\033[0m";
+        }
+    }
+
+    public function npm_compare($pack, $change = null)
+    {
+        $dirs = [
+            '../processmaker',
+            '../modeler',
+            '../screen-builder',
+            '../vue-form-elements',
+        ];
+        $buildScripts = [
+            'build-bundle',
+            'build',
+            'dev',
+        ];
+        $cwd = \getcwd();
+        foreach($dirs as $dir) {
+            $backup = $this->load("{$dir}/package.json");
+            $json = $this->load("{$dir}/package.json");
+            $version = $json->dependencies->$pack ?? $json->devDependencies->$pack ?? null;
+            if (!$version) continue;
+            $this->print(\sprintf("%25s: %s@%s", $dir, $pack, $version));
+            if ($change && $version !== $change) {
+                $this->print('******************************************************');
+                if (isset($json->dependencies->$pack)) {
+                    $json->dependencies->$pack = $change;
+                }
+                if (isset($json->devDependencies->$pack)) {
+                    $json->devDependencies->$pack = $change;
+                }
+                $this->save("{$dir}/package.json", $json);
+                \chdir($dir);
+                if ($this->exec('npm install')) {
+                    \chdir($cwd);
+                    $this->print("ACTUALIZACION FALLO: INSTALL {$dir}");
+                    $this->save("{$dir}/package.json", $backup);
+                    break;
+                }
+                foreach($buildScripts as $script) {
+                    if (isset($json->scripts->$script)) {
+                        if ($this->exec("npm run $script")) {
+                            \chdir($cwd);
+                            $this->print("ACTUALIZACION FALLO: BUILD {$dir}");
+                            $this->save("{$dir}/package.json", $backup);
+                            break 2;
+                        }
+                        break;
+                    }
+                }
+                \chdir($cwd);
+                $this->print('******************************************************');
+                $this->print('');
+            }
+        }
+    }
+
+    private function npmbuild()
+    {
+        $buildScripts = [
+            'build-bundle',
+            'build',
+            'dev',
+        ];
+        $json = $this->load("package.json");
+        foreach($buildScripts as $script) {
+            if (isset($json->scripts->$script)) {
+                $this->exec("npm run $script");
+                break;
+            }
         }
     }
 }

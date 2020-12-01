@@ -1,6 +1,7 @@
 <?php
-
+<<<if ($seedOrSeeder==='seeders'):>>>
 namespace Database\Seeders;
+<<<endif;>>>
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;

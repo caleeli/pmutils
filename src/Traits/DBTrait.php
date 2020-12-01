@@ -67,14 +67,16 @@ trait DBTrait
     {
         $conn = $this->db_connect($url);
         $sm = $conn->getSchemaManager();
+        $seedOrSeeder = \file_exists('database/seeders') ? 'seeders' : 'seeds';
         $this->execTemplate(
             $this->createTemplate('seeder'),
             [
                 'name' => $name,
+                'seedOrSeeder' => $seedOrSeeder,
             ]
         );
         $tables = $sm->listTables();
-        $f = \fopen("database/seeders/{$name}.txt", 'w');
+        $f = \fopen("database/{$seedOrSeeder}/{$name}.txt", 'w');
         foreach($tables as $table) {
             $name = $table->getName();
             $sql = "select * from {$name}";
