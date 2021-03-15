@@ -3,6 +3,7 @@
 namespace David\PmUtils;
 
 use David\PmUtils\Traits\DBTrait;
+use David\PmUtils\Traits\PMTrait;
 use ReflectionMethod;
 use ReflectionObject;
 
@@ -10,6 +11,7 @@ class Console
 {
     use MonitorTrait;
     use DBTrait;
+    use PMTrait;
 
     public $composer;
 
@@ -26,11 +28,13 @@ class Console
     public function help()
     {
         $ref = new ReflectionObject($this);
-        foreach($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-            if ($method->getName() === '__construct') continue;
+        foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+            if ($method->getName() === '__construct') {
+                continue;
+            }
             $docs = explode("\n", $method->getDocComment());
             $params = [];
-            foreach($method->getParameters() as $p) {
+            foreach ($method->getParameters() as $p) {
                 $params[] = '$'. $p->getName();
             }
             $this->print(
@@ -63,7 +67,9 @@ class Console
 
     private function save($filename = 'composer.json', $data = null)
     {
-        if ($data === null) $data = $this->composer;
+        if ($data === null) {
+            $data = $this->composer;
+        }
         $json = str_replace(
             ['\/', '    '],
             ['/', '  '],
@@ -109,7 +115,10 @@ class Console
 
     public function find_repo($name)
     {
-        foreach($this->composer->repositories as $repo) {
+        if (!isset($this->composer->repositories)) {
+            $this->composer->repositories = [];
+        }
+        foreach ($this->composer->repositories as $repo) {
             if (substr($repo->url, -strlen($name)) === $name) {
                 return $repo;
             }
@@ -125,11 +134,14 @@ class Console
      */
     public function npmupdate($path)
     {
+        $this->npmbuild();
         $config = $this->load('package.json');
         $path = "{$path}/node_modules/{$config->name}";
         $skip = ['node_modules', 'tests', 'coverage', 'package.json'];
-        foreach(glob('*') as $file) {
-            if (in_array(basename($file), $skip)) continue;
+        foreach (glob('*') as $file) {
+            if (in_array(basename($file), $skip)) {
+                continue;
+            }
             if (is_file($file)) {
                 $this->exec("rm $path/$file");
                 $this->exec("cp $file $path");
@@ -181,12 +193,6 @@ class Console
 
     public function build()
     {
-        $dirs = [
-            '../processmaker',
-            '../modeler',
-            '../screen-builder',
-            '../vue-form-elements',
-        ];
         $cwd = \getcwd();
         chdir('../vue-form-elements');
         $this->npmupdate('../screen-builder');
@@ -212,10 +218,10 @@ class Console
         $versions = [];
         foreach ($dirs as $dir) {
             $json = $this->load("{$dir}/package.json");
-            foreach($json->dependencies as $pack => $version) {
+            foreach ($json->dependencies as $pack => $version) {
                 $versions[$dir][$pack] = $version;
             }
-            foreach($json->devDependencies as $pack => $version) {
+            foreach ($json->devDependencies as $pack => $version) {
                 $versions[$dir][$pack] = $version;
             }
         }
@@ -223,8 +229,10 @@ class Console
         $this->print(\sprintf("%25s %20s %20s %20s %20s", '/', ...$dirs));
         $lines = [];
         foreach ($dirs as $dir) {
-            foreach($versions[$dir] as $pack => $version) {
-                if (isset($lines[$pack])) continue;
+            foreach ($versions[$dir] as $pack => $version) {
+                if (isset($lines[$pack])) {
+                    continue;
+                }
                 $vers = [];
                 foreach ($dirs as $dir) {
                     if (isset($versions[$dir][$pack])) {
@@ -236,9 +244,9 @@ class Console
                 }
             }
         }
-        foreach($lines as $pack => $vers) {
+        foreach ($lines as $pack => $vers) {
             $ok = true;
-            foreach($vers as $i => $v) {
+            foreach ($vers as $i => $v) {
                 $ok = $ok && ($i === 0 || $v === $vers[$i-1]);
             }
             if (!$ok) {
@@ -263,11 +271,13 @@ class Console
             'dev',
         ];
         $cwd = \getcwd();
-        foreach($dirs as $dir) {
+        foreach ($dirs as $dir) {
             $backup = $this->load("{$dir}/package.json");
             $json = $this->load("{$dir}/package.json");
             $version = $json->dependencies->$pack ?? $json->devDependencies->$pack ?? null;
-            if (!$version) continue;
+            if (!$version) {
+                continue;
+            }
             $this->print(\sprintf("%25s: %s@%s", $dir, $pack, $version));
             if ($change && $version !== $change) {
                 $this->print('******************************************************');
@@ -285,7 +295,7 @@ class Console
                     $this->save("{$dir}/package.json", $backup);
                     break;
                 }
-                foreach($buildScripts as $script) {
+                foreach ($buildScripts as $script) {
                     if (isset($json->scripts->$script)) {
                         if ($this->exec("npm run $script")) {
                             \chdir($cwd);
@@ -311,7 +321,7 @@ class Console
             'dev',
         ];
         $json = $this->load("package.json");
-        foreach($buildScripts as $script) {
+        foreach ($buildScripts as $script) {
             if (isset($json->scripts->$script)) {
                 $this->exec("npm run $script");
                 break;
