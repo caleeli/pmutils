@@ -14,9 +14,11 @@ class Console
     use PMTrait;
 
     public $composer;
+    public $composer_filename;
 
     public function __construct($filename)
     {
+        $this->composer_filename = realpath($filename);
         $this->composer = $this->load($filename);
     }
 
@@ -91,6 +93,30 @@ class Console
         passthru("composer require $pack");
         $install = explode('/', $pack)[1] . ':install';
         passthru("php artisan $install");
+        // reload composer content after install package
+        $this->composer = $this->load($this->composer_filename);
+    }
+
+    /**
+     * Instala los paquetes base de PM4
+     *
+     * @return void
+     */
+    public function install_base()
+    {
+        // Add package-savedsearch dev repo
+        $this->add_repo('packages');
+        $this->add_repo('connector-send-email');
+        $this->add_repo('package-data-sources');
+        $this->add_repo('package-collections');
+        $this->add_repo('package-savedsearch');
+        $this->composer = $this->load($this->composer_filename);
+
+        $this->install('packages');
+        $this->install('connector-send-email');
+        $this->install('package-data-sources');
+        $this->install('package-collections');
+        $this->install('package-savedsearch');
     }
 
     public function add_repo($name)
