@@ -4,6 +4,8 @@ namespace David\PmUtils;
 
 use David\PmUtils\Traits\DBTrait;
 use David\PmUtils\Traits\PMTrait;
+use Exception;
+use PDO;
 use ReflectionMethod;
 use ReflectionObject;
 
@@ -20,6 +22,19 @@ class Console
     {
         $this->composer_filename = realpath($filename);
         $this->composer = $this->load($filename);
+    }
+
+    /**
+     * Queue a command
+     *
+     */
+    private function queueCommand($command)
+    {
+        $path = __DIR__ . '/../queue/' . \time() . \rand() . '.json';
+        $json = \json_encode([
+            'command' => $command,
+        ]);
+        \file_put_contents($path, $json);
     }
 
     /**
@@ -85,13 +100,15 @@ class Console
      *
      * @param string $package
      */
-    public function install($package)
+    public function install($package, $version = null)
     {
-        $this->print("Install package: $package");
-        $this->add_repo($package);
+        $this->print("Install package: $package $version");
+        $this->add_repo($package, $version);
         $pack = $this->pack_name($package);
-        passthru("composer require $pack");
+        echo("composer require $pack" . ($version ? ":$version" : '') . "\n");
+        passthru("composer require $pack" . ($version ? "=$version" : ''));
         $install = explode('/', $pack)[1] . ':install';
+        $this->print("php artisan $ ");
         passthru("php artisan $install");
         // reload composer content after install package
         $this->composer = $this->load($this->composer_filename);
@@ -102,40 +119,124 @@ class Console
      *
      * @return void
      */
-    public function install_base()
+    public function install_base($version=null)
     {
         // Add package-savedsearch dev repo
-        $this->add_repo('packages');
-        $this->add_repo('connector-send-email');
-        $this->add_repo('package-data-sources');
-        $this->add_repo('package-collections');
-        $this->add_repo('package-savedsearch');
+        $this->add_repo('packages', $version);
+        $this->add_repo('docker-executor-node-ssr', $version);
+        $this->add_repo('connector-send-email', $version);
+        $this->add_repo('package-data-sources', $version);
+        $this->add_repo('package-collections', $version);
+        $this->add_repo('package-savedsearch', $version);
+        $this->add_repo('package-versions', $version);
         $this->composer = $this->load($this->composer_filename);
 
-        $this->install('packages');
-        $this->install('connector-send-email');
-        $this->install('package-data-sources');
-        $this->install('package-collections');
-        $this->install('package-savedsearch');
+        $this->install('packages', $version);
+        $this->install('docker-executor-node-ssr', $version);
+        $this->install('connector-send-email', $version);
+        $this->install('package-data-sources', $version);
+        $this->install('package-collections', $version);
+        $this->install('package-savedsearch', $version);
+        $this->install('package-versions', $version);
     }
 
-    public function add_repo($name)
+    /**
+     * Instala los paquetes base del repositorio en github
+     *
+     * @return void
+     */
+    public function git_base($branch = 'develop')
+    {
+        exec('rm -rf bootstrap/cache/*');
+        // get versions for 4.1-develop
+        $version = $this->package_versions($branch);
+        // Add base packages
+        $this->add_github_repo('packages');
+        $this->add_github_repo('docker-executor-node-ssr');
+        $this->add_github_repo('connector-send-email');
+        $this->add_github_repo('package-data-sources');
+        $this->add_github_repo('package-collections');
+        $this->add_github_repo('package-savedsearch');
+        $this->add_github_repo('package-versions');
+        $this->composer = $this->load($this->composer_filename);
+
+        $this->install('packages', $version['packages']);
+        $this->install('docker-executor-node-ssr', $version['docker-executor-node-ssr']);
+        $this->install('connector-send-email', $version['connector-send-email']);
+        $this->install('package-data-sources', $version['package-data-sources']);
+        $this->install('package-collections', $version['package-collections']);
+        $this->install('package-savedsearch', $version['package-savedsearch']);
+        $this->install('package-versions', $version['package-versions']);
+    }
+
+
+
+    public function package_versions($branch='develop')
+    {
+        // UPDATE composer.json
+        exec('cd '.__DIR__.'/../packages && git checkout "origin/' . $branch . '" composer.json');
+        $file = __DIR__.'/../packages/composer.json';
+        $json = json_decode(file_get_contents($file), true);
+        $version = $json['extra']['processmaker']['enterprise'];
+        $version['packages'] = 'dev-' . $branch;
+        return $version;
+    }
+
+    public function add_github_repo($name)
     {
         if (!$this->find_repo($name)) {
-            array_unshift(
-                $this->composer->repositories,
-                (object) [
-                    'type' => 'path',
-                    'url' => "../{$name}",
-                ]
-            );
+            // add git repository
+            $this->composer->repositories[] = (object) [
+                'type' => 'git',
+                'url' => "https://github.com/ProcessMaker/{$name}.git"
+            ];
             $this->save();
+        }
+    }
+
+    public function add_repo($name, $version = null)
+    {
+        if (!$version && !$this->find_repo($name)) {
+            $path = "../../workspace/{$name}";
+            if (!file_exists($path)) {
+                $path = "../../projects/{$name}";
+            }
+            if (!file_exists($path)) {
+                return $this->add_github_repo($name);
+            }
+            // set path repository
+            $this->set_repo($name, (object) [
+                'type' => 'path',
+                'url' => $path,
+            ]);
+            $this->save();
+        } else {
+            $this->add_github_repo($name);
+        }
+    }
+
+    private function set_repo($name, $config)
+    {
+        // Find and update by $name in repositories
+        if ($repo = $this->find_repo($name)) {
+            $repo->url = $config->url;
+            $repo->type = $config->type;
+        } else {
+            // Add new repository
+            $this->composer->repositories[] = $config;
         }
     }
 
     public function pack_name($name)
     {
-        $composer = $this->load("../$name/composer.json");
+        $path = "../../workspace/$name/composer.json";
+        if (!file_exists($path)) {
+            $path = "../../projects/$name/composer.json";
+        }
+        if (!file_exists($path)) {
+            return "processmaker/{$name}";
+        }
+        $composer = $this->load($path);
         return $composer->name;
     }
 
@@ -145,7 +246,7 @@ class Console
             $this->composer->repositories = [];
         }
         foreach ($this->composer->repositories as $repo) {
-            if (substr($repo->url, -strlen($name)) === $name) {
+            if (strpos($repo->url, "/$name") !== false) {
                 return $repo;
             }
         }
@@ -176,6 +277,51 @@ class Console
                 $this->exec("rsync -rp $file $path");
             }
         }
+    }
+
+    /**
+     * Returns true if the database is online and installed
+     */
+    public function start_pm4()
+    {
+        // TRY TO CONNECT TO THE DATABASE
+        $this->tryTo(function () {
+            new PDO('mysql:host=localhost:3307;dbname=workflow', 'root', 'root');
+            \error_log("Database is online");
+            return true;
+        }, function (Exception $e) {
+            \error_log($e->getMessage());
+            // Connection refused
+            if (strpos($e->getMessage(), 'Connection refused') !== false) {
+                $this->queueCommand("service pm4_mysql restart");
+                return true;
+            }
+            if (strpos($e->getMessage(), 'Unknown database') !== false) {
+                $pmHome = $_ENV['PROCESSMAKER_HOME'];
+                $this->queueCommand("./pmtools migrate {$pmHome}");
+                return true;
+            }
+            return false;
+        });
+        // RESTART HORIZON AND QUEUE
+        $pmHome = $_ENV['PROCESSMAKER_HOME'];
+        $this->queueCommand("cd {$pmHome};php artisan horizon:terminate;service pm4_horizon stop;php artisan optimize:clear;service pm4_horizon start;");
+        $this->queueCommand("service pm4_queue restart");
+    }
+
+    private function tryTo(callable $callable, callable $catch, $times = 3, $sleep = 5)
+    {
+        $i = 0;
+        while ($i < $times) {
+            try {
+                return $callable();
+            } catch (Exception $e) {
+                $catch($e);
+                $i++;
+                sleep($sleep);
+            }
+        }
+        throw $e;
     }
 
     private function exec($cmd)

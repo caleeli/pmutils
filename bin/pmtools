@@ -6,6 +6,12 @@ require __DIR__ . '/../vendor/autoload.php';
 use David\PmUtils\Console;
 use David\PmUtils\Str;
 
+if (file_exists(__DIR__ . '/../.env')) {
+    foreach (parse_ini_file(__DIR__ . '/../.env') as $key=>$value) {
+        $_ENV[$key] = $value;
+    }
+}
+
 class_alias(Str::class, 'Str');
 
 $console = new Console('composer.json');

@@ -28,17 +28,44 @@ class Service
 
     public function restart($service)
     {
-        $this->queueCommand("service {$service} restart");
+        if ($service == 'pm4_horizon') {
+            $pmHome = $_ENV['PROCESSMAKER_HOME'];
+            $this->queueCommand("cd {$pmHome};php artisan horizon:terminate;service {$service} stop;php artisan optimize:clear;service {$service} start;");
+        } else {
+            $this->queueCommand("service {$service} restart");
+        }
         return [
             'success' => true,
         ];
     }
 
-    public function migrate()
+    public function migrate($version)
     {
-        $this->queueCommand("./pmtools migrate /home/david/workspace/processmaker");
+        $pmHome = $_ENV['PROCESSMAKER_HOME'];
+        if ($version === '4.1') {
+            $pmHome = '/home/david/projects/processmaker';
+        }
+        $this->queueCommand("./pmtools migrate {$pmHome}");
         return [
             'success' => true,
+        ];
+    }
+
+    public function install()
+    {
+        $package = $_GET['package'];
+        $version = $_GET['version'];
+        $pmHome = $_ENV['PROCESSMAKER_HOME'];
+        $pmtools = __DIR__ . '/../../bin/pmtools';
+        $cwd = getcwd();
+        chdir($pmHome);
+        exec($pmtools . " install {$package} {$version} 2>&1", $output, $code);
+        chdir($cwd);
+        // json header
+        header('Content-Type: application/json');
+        return [
+            'success' => $code === 0,
+            'output' => implode("\n", $output),
         ];
     }
 
