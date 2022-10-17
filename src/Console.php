@@ -105,6 +105,8 @@ class Console
         $this->print("Install package: $package $version");
         $this->add_repo($package, $version);
         $pack = $this->pack_name($package);
+        // shell escape version
+        $version = escapeshellarg($version);
         echo("composer require $pack" . ($version ? ":$version" : '') . "\n");
         passthru("composer require $pack" . ($version ? "=$version" : ''));
         $install = explode('/', $pack)[1] . ':install';
