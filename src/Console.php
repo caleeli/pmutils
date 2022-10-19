@@ -143,6 +143,20 @@ class Console
     }
 
     /**
+     * Instala los paquetes enterprise definidos en el composer.json
+     *
+     * @return void
+     */
+    public function install_enterprise($version=null)
+    {
+        // Get packages from extra.processmaker.enterprise
+        $packages = $this->composer->extra->processmaker->enterprise;
+        foreach ($packages as $package) {
+            $this->install($package, $version);
+        }
+    }
+
+    /**
      * Instala los paquetes base del repositorio en github
      *
      * @return void
