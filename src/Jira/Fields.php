@@ -12,6 +12,10 @@ class Fields
     public ?Project $project;
     public $summary;
     public IssueType $issueType;
+    /**
+     * @var IssueLinks|IssueLink[]
+     */
+    public IssueLinks $issuelinks;
     public Priority $priority;
     public $created;
     public $updated;
@@ -40,6 +44,7 @@ class Fields
         $this->status = isset($data['status']) ? new Status($data['status']) : null;
         $this->project = isset($data['project']) ? new Project($data['project']) : null;
         $this->summary = $data['summary'] ?? null;
+        $this->issuelinks = new IssueLinks($data['issuelinks'] ?? []);
         $this->issueType = isset($data['issuetype']) ? new IssueType($data['issuetype']) : null;
         $this->priority = isset($data['priority']) ? new Priority($data['priority']) : null;
         $this->created = $data['created'] ?? null;

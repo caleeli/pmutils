@@ -6,7 +6,7 @@ After=network.target
 User=david
 Group=david
 WorkingDirectory=/home/david/workspace/processmaker
-ExecStart=docker run --rm -p 3307:3306 -e MYSQL_ROOT_PASSWORD=root --tmpfs=/var/lib/mysql:rw,noexec,nosuid,size=700m --tmpfs=/tmp:rw,noexec,nosuid,size=50m mysql:5.7.23
+ExecStart=docker run --rm -p 3307:3306 -e MYSQL_ROOT_PASSWORD=root --tmpfs=/var/lib/mysql:rw,noexec,nosuid,size=700m --tmpfs=/tmp:rw,noexec,nosuid,size=50m -v /home/david/workspace/mysql.ini:/etc/mysql/conf.d/my-custom.cnf mysql:8.0
 
 Restart=on-failure
 

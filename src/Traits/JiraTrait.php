@@ -127,7 +127,7 @@ trait JiraTrait
         $this->searchTickets($jql);
     }
 
-    public function jira_epic($epic)
+    public function jira_epic($epic, $print = true)
     {
         $jql = '"Epic Link"=' . $epic . ' OR "Parent Link"=' . $epic . ' ORDER BY rank';
         $jqlQuery = '/rest/api/3/search?jql=' . urlencode($jql);
@@ -136,7 +136,7 @@ trait JiraTrait
             'PENDING' => [],
             'DONE' => [],
         ];
-        $logIssues = true;
+        $logIssues = $print;
         foreach($result['issues'] as $res) {
             $issue = new Issue($res);
             if ($logIssues) {
@@ -162,21 +162,24 @@ trait JiraTrait
                 $pipeline['PENDING'][$assignee][] = $issue;
             }
         }
-        // Show pending issues
-        foreach($pipeline['PENDING'] as $assignee => $issues) {
+        if ($print) {
+            // Show pending issues
+            foreach($pipeline['PENDING'] as $assignee => $issues) {
+                echo "-----\n";
+                echo $assignee, ": ";
+                foreach($issues as $issue) {
+                    echo $issue->key, " ";
+                }
+                echo "\n";
+            }
+            // Show done issues
             echo "-----\n";
-            echo $assignee, ": ";
-            foreach($issues as $issue) {
-                echo $issue->key, " ";
+            echo "DONE: ";
+            foreach($pipeline['DONE'] as $issue) {
+                echo $issue->key, "({$issue->fields->timeoriginalestimate})";
             }
             echo "\n";
         }
-        // Show done issues
-        echo "-----\n";
-        echo "DONE: ";
-        foreach($pipeline['DONE'] as $issue) {
-            echo $issue->key, "({$issue->fields->timeoriginalestimate})";
-        }
-        echo "\n";
+        return $pipeline;
     }
 }

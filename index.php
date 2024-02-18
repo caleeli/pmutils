@@ -161,12 +161,12 @@ function packageVersion($package) {
                 openAdminer() {
                     window.open(
                         'http://localhost/adminer.php?server=127.0.0.1%3A3307&username=root&db=workflow',
-                        'blank');
+                        '_blank');
                 },
                 openPM4() {
                     window.open(
                         'http://localhost:8089',
-                        'blank');
+                        '_blank');
                 }
             },
         });

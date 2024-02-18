@@ -3,6 +3,7 @@
 namespace David\PmUtils;
 
 use David\PmUtils\Traits\DBTrait;
+use David\PmUtils\Traits\JiraTrait;
 use David\PmUtils\Traits\PMTrait;
 use Exception;
 use PDO;
@@ -14,6 +15,7 @@ class Console
     use MonitorTrait;
     use DBTrait;
     use PMTrait;
+    use JiraTrait;
 
     public $composer;
     public $composer_filename;
@@ -22,6 +24,7 @@ class Console
     {
         $this->composer_filename = realpath($filename);
         $this->composer = $this->load($filename);
+        $this->jiraApiToken = getenv('JIRA_API_TOKEN');
     }
 
     /**
@@ -89,7 +92,7 @@ class Console
         }
         $json = str_replace(
             ['\/', '    '],
-            ['/', '  '],
+            ['/', '    '],
             json_encode($data, JSON_PRETTY_PRINT)
         ) . "\n";
         file_put_contents($filename, $json);
@@ -106,9 +109,9 @@ class Console
         $this->add_repo($package, $version);
         $pack = $this->pack_name($package);
         // shell escape version
-        $version = escapeshellarg($version);
-        echo("composer require $pack" . ($version ? ":$version" : '') . "\n");
-        passthru("composer require $pack" . ($version ? "=$version" : ''));
+        $version = $version ? escapeshellarg($version) : '';
+        echo("composer require $pack" . ($version ? ":$version" : '') . " --ignore-platform-reqs\n");
+        passthru("composer require $pack" . ($version ? "=$version" : '') . ' --ignore-platform-reqs');
         $install = explode('/', $pack)[1] . ':install';
         $this->print("php artisan $ ");
         passthru("php artisan $install");
@@ -151,9 +154,24 @@ class Console
     {
         // Get packages from extra.processmaker.enterprise
         $packages = $this->composer->extra->processmaker->enterprise;
-        foreach ($packages as $package) {
-            $this->install($package, $version);
+        $this->print("Install enterprise packages:");
+        $composerCmd = "composer require --ignore-platform-reqs ";
+        $installCmd = "";
+        foreach ($packages as $package => $version) {
+            $this->add_repo($package, $version);
+            $pack = $this->pack_name($package);
+            // shell escape version
+            $version = escapeshellarg($version);
+            $composerCmd .= " $pack" . ($version ? ":$version" : '') . "";
+            $install = explode('/', $pack)[1] . ':install';
+            $installCmd .= "php artisan $install;";
         }
+        $this->print($composerCmd);
+        passthru($composerCmd);
+        $this->print($installCmd);
+        passthru($installCmd);
+        // reload composer content after install package
+        $this->composer = $this->load($this->composer_filename);
     }
 
     /**
@@ -515,5 +533,11 @@ class Console
                 break;
             }
         }
+    }
+
+    public function ai(...$command)
+    {
+        $command = \implode(' ', $command);
+        $this->print("run $command");
     }
 }
