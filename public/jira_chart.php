@@ -1,4 +1,104 @@
 <!doctype html>
+<?php
+use David\PmUtils\Console;
+use David\PmUtils\Jira\Issue;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+if (file_exists(__DIR__ . '/../.env')) {
+    foreach (parse_ini_file(__DIR__ . '/../.env') as $key=>$value) {
+        $_ENV[$key] = $value;
+        putenv("$key=$value");
+    }
+}
+
+ini_set('display_errors', 1);
+$epic = $_GET['epic'] ?? 'FOUR-11530';
+const STATUS_EN_CURSO = '3';
+
+$console = new Console(__DIR__);
+$pipeline = $console->jira_epic($epic, false);
+
+function sumTime(array $issues)
+{
+    $doneSum = 0;
+    foreach($issues as $issue) {
+        $doneSum += $issue->fields->timeoriginalestimate;
+    }
+    $doneSum = round($doneSum / 3600);
+    return $doneSum;
+}
+function renderIssue(Issue $issue)
+{
+    $link = 'https://processmaker.atlassian.net/browse/' . $issue->key;
+    $hours = round($issue->fields->timeoriginalestimate / 3600);
+    $class = '';
+    if (!$hours) {
+        $class .= 'font-bold bg-orange-600 ';
+    }
+    echo "<a class='ticket ticket-{$issue->fields->status->statusCategory->colorName}'",
+    "href='{$link}' target='_blank'>";
+    echo $issue->key, "<small class='{$class}'>({$hours}h)</small>";
+    echo "</a>";
+}
+function findBlockedBy(array $allIssues, Issue $issue)
+{
+    $blockedBy = [];
+    foreach($allIssues as $issue2) {
+        if ($issue2->fields->status->statusCategory->key === 'done') {
+            continue;
+        }
+        if (strpos($issue2->fields->summary, 'blocked by ' . $issue->key) !== false) {
+            $blockedBy[] = $issue2;
+        }
+    }
+    return $blockedBy;
+}
+function selectActive(array $issues)
+{
+    $today = [];
+    $rest = [];
+    foreach($issues as $issue) {
+        if ($issue->fields->status->id === STATUS_EN_CURSO) {
+            $today[] = $issue;
+        } else {
+            $rest[] = $issue;
+        }
+    }
+    return [$today, $rest];
+}
+/**
+ * @param Issue[] $issues
+ * @return array
+ */
+function selectReadyNotBlocked(array $issues)
+{
+    $ready = [];
+    $rest = [];
+    foreach($issues as $issue) {
+        $blockedBy = $issue->fields->issuelinks->having('inwardIssue');
+        if (count($blockedBy) === 0) {
+            $ready[] = $issue;
+        } else {
+            $rest[] = $issue;
+        }
+    }
+    return [$ready, $rest];
+}
+function selectBlockedNotReady(array $issues)
+{
+    return [$issues, []];
+}
+
+// PENDING SUM
+$pendingSum = 0;
+foreach($pipeline['PENDING'] as $assignee => $issues) {
+    $pendingSum += sumTime($issues);
+}
+// DONE SUM
+$doneSum = sumTime($pipeline['DONE']);
+
+?>
 <html lang="en">
 
 <head>
@@ -9,100 +109,6 @@
 </head>
 
 <body>
-<?php
-
-    use David\PmUtils\Console;
-    use David\PmUtils\Jira\Issue;
-
-    require __DIR__ . '/../vendor/autoload.php';
-
-    ini_set('display_errors', 1);
-    $epic = $_GET['epic'] ?? 'FOUR-11530';
-    const STATUS_EN_CURSO = '3';
-
-    $console = new Console(__DIR__);
-    $pipeline = $console->jira_epic($epic, false);
-
-    function sumTime(array $issues)
-    {
-        $doneSum = 0;
-        foreach($issues as $issue) {
-            $doneSum += $issue->fields->timeoriginalestimate;
-        }
-        $doneSum = round($doneSum / 3600);
-        return $doneSum;
-    }
-    function renderIssue(Issue $issue)
-    {
-        $link = 'https://processmaker.atlassian.net/browse/' . $issue->key;
-        $hours = round($issue->fields->timeoriginalestimate / 3600);
-        $class = '';
-        if (!$hours) {
-            $class .= 'font-bold bg-orange-600 ';
-        }
-        echo "<a class='ticket ticket-{$issue->fields->status->statusCategory->colorName}'",
-        "href='{$link}' target='_blank'>";
-        echo $issue->key, "<small class='{$class}'>({$hours}h)</small>";
-        echo "</a>";
-    }
-    function findBlockedBy(array $allIssues, Issue $issue)
-    {
-        $blockedBy = [];
-        foreach($allIssues as $issue2) {
-            if ($issue2->fields->status->statusCategory->key === 'done') {
-                continue;
-            }
-            if (strpos($issue2->fields->summary, 'blocked by ' . $issue->key) !== false) {
-                $blockedBy[] = $issue2;
-            }
-        }
-        return $blockedBy;
-    }
-    function selectActive(array $issues)
-    {
-        $today = [];
-        $rest = [];
-        foreach($issues as $issue) {
-            if ($issue->fields->status->id === STATUS_EN_CURSO) {
-                $today[] = $issue;
-            } else {
-                $rest[] = $issue;
-            }
-        }
-        return [$today, $rest];
-    }
-    /**
-     * @param Issue[] $issues
-     * @return array
-     */
-    function selectReadyNotBlocked(array $issues)
-    {
-        $ready = [];
-        $rest = [];
-        foreach($issues as $issue) {
-            $blockedBy = $issue->fields->issuelinks->having('inwardIssue');
-            if (count($blockedBy) === 0) {
-                $ready[] = $issue;
-            } else {
-                $rest[] = $issue;
-            }
-        }
-        return [$ready, $rest];
-    }
-    function selectBlockedNotReady(array $issues)
-    {
-        return [$issues, []];
-    }
-
-    // PENDING SUM
-    $pendingSum = 0;
-    foreach($pipeline['PENDING'] as $assignee => $issues) {
-        $pendingSum += sumTime($issues);
-    }
-    // DONE SUM
-    $doneSum = sumTime($pipeline['DONE']);
-
-    ?>
     <style>
         table {
             border-spacing: 0px;
