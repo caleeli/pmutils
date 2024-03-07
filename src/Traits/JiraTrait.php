@@ -182,4 +182,13 @@ trait JiraTrait
         }
         return $pipeline;
     }
+
+    public function jira_filter($id)
+    {
+        // GET /rest/api/3/filter/{$id}
+        $filterEndpoint = "/rest/api/3/filter/{$id}";
+        $res = $this->makeJiraRequest($filterEndpoint);
+        var_dump($res);
+        return $res;
+    }
 }
