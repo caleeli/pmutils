@@ -2,6 +2,7 @@
 <?php
 use David\PmUtils\Console;
 use David\PmUtils\Jira\Issue;
+use David\PmUtils\Jira\Jira;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -13,11 +14,22 @@ if (file_exists(__DIR__ . '/../.env')) {
 }
 
 ini_set('display_errors', 1);
-$epic = $_GET['epic'] ?? 'FOUR-11530';
-const STATUS_EN_CURSO = '3';
+$epic = $_GET['epic'] ?? null;
+$filter = $_GET['filter'] ?? null;
+$board = $_GET['board'] ?? null;
+const ACTIVE_STATUSES = ['Scheduled', 'In Progress', 'In Review', 'Pull Request'];
+const READY_STATUSES = ['In Backlog', 'Ready for Review'];
 
-$console = new Console(__DIR__);
-$pipeline = $console->jira_epic($epic, false);
+if ($epic) {
+    $console = new Console(__DIR__);
+    $pipeline = $console->jira_epic($epic, false);
+} elseif ($filter) {
+    $pipeline = Jira::getInstance()->getFilterPipeline($filter);
+} elseif ($board) {
+    $pipeline = Jira::getInstance()->getBoardPipeline($board);
+} else {
+    die('No ?epic= or ?filter= provided');
+}
 
 function sumTime(array $issues)
 {
@@ -59,7 +71,7 @@ function selectActive(array $issues)
     $today = [];
     $rest = [];
     foreach($issues as $issue) {
-        if ($issue->fields->status->id === STATUS_EN_CURSO) {
+        if (in_array($issue->fields->status->name, ACTIVE_STATUSES)) {
             $today[] = $issue;
         } else {
             $rest[] = $issue;
@@ -77,7 +89,7 @@ function selectReadyNotBlocked(array $issues)
     $rest = [];
     foreach($issues as $issue) {
         $blockedBy = $issue->fields->issuelinks->having('inwardIssue');
-        if (count($blockedBy) === 0) {
+        if (count($blockedBy) === 0 && in_array($issue->fields->status->name, READY_STATUSES)) {
             $ready[] = $issue;
         } else {
             $rest[] = $issue;
